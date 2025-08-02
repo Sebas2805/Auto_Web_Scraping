@@ -41,8 +41,14 @@ with sync_playwright() as p:
         # Esperar que el formulario esté visible antes de buscar links
         form_locator = page.locator('form[name="form"][action="ucompare.cfm"]')
         form_locator.wait_for(state='visible', timeout=10000)
+
         link_elements = form_locator.locator('a[href*="cardetail.cfm?c="]')
-        texts = link_elements.all()
+        link_elements.wait_for(state='attached', timeout=10000)
+
+        # Debug: imprime cantidad antes de obtenerlos
+        print("Número de links detectados:", link_elements.count())
+
+        texts = link_elements.all()  # aquí debería funcionar
         hrefs = []
         for element in texts:
             href = element.get_attribute('href')
