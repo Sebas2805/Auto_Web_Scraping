@@ -41,8 +41,6 @@ with sync_playwright() as p:
         # Esperar que el formulario esté visible antes de buscar links
         form_locator = page.locator('form[name="form"][action="ucompare.cfm"]')
         form_locator.wait_for(state='visible', timeout=10000)
-
-            # Obtener los enlaces en ese momento (locator fresco)
         link_elements = form_locator.locator('a[href*="cardetail.cfm?c="]')
         texts = link_elements.all()
         hrefs = []
