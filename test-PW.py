@@ -17,63 +17,57 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 car_links = []
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)  # igual que headless en Selenium
+    browser = p.chromium.launch(headless=True)
     page = browser.new_page()
 
     page.goto("https://crautos.com/autosusados/index.cfm")
-
-    # Esperar al select marca y filtrar por 'Eléctrico'
-    #page.wait_for_selector('select[name="brand"]', timeout=10000)  # Ajustar selector acorde si es distinto
-    
-    # Seleccionar Combustible Eléctrico (value='4')
     page.locator('select[name="fuel"]').select_option(value='4')
-
-    #page.locator('select[name="priceto"]').select_option(value='30000000') #Price limit
-
-    # Clic en botón buscar
     page.locator('#searchform button[type="submit"]').click()
-
-    # Esperar que cargue resultados - form con name="form"
     page.wait_for_selector('form[name="form"]', timeout=10000)
 
-    # 3. Colectar links recorriendo todas las páginas
     while True:
-        # Esperar que el formulario esté visible antes de buscar links
-        form_locator = page.locator('form[name="form"][action="ucompare.cfm"]')
-        form_locator.wait_for(state='visible', timeout=10000)
+        try:
+            time.sleep(1)  # Pequeña pausa para estabilizar la carga
 
-        link_elements = form_locator.locator('a[href*="cardetail.cfm?c="]')
-        link_elements.wait_for(state='attached', timeout=10000)
+            form_locator = page.locator('form[name="form"][action="ucompare.cfm"]')
+            form_locator.wait_for(state='visible', timeout=10000)
 
-        # Debug: imprime cantidad antes de obtenerlos
-        print("Número de links detectados:", link_elements.count())
+            link_elements = form_locator.locator('a[href*="cardetail.cfm?c="]')
+            count = link_elements.count()
+            print(f"Número de links detectados: {count}")
+            if count == 0:
+                print("No se encontraron links.")
+                break
 
-        texts = link_elements.all()  # aquí debería funcionar
-        hrefs = []
-        for element in texts:
-            href = element.get_attribute('href')
-            if href:
-                # Normaliza URL relativa y verifica exclusions
-                if not 'autosnuevos' in href.lower():
+            texts = link_elements.all()
+            hrefs = []
+            for element in texts:
+                href = element.get_attribute('href')
+                if href and 'autosnuevos' not in href.lower():
                     if href.startswith('http'):
                         full_url = href
                     else:
                         full_url = 'https://crautos.com/autosusados/' + href.lstrip('/')
                     hrefs.append(full_url)
-        
-        car_links.extend(hrefs)
+            car_links.extend(hrefs)
 
-        # Intentar click en siguiente página (li.page-item.page-next > a)
-        try:
             next_button = page.locator('li.page-item.page-next a')
             if next_button.count() == 0 or not next_button.is_enabled():
+                print("No hay botón siguiente o está deshabilitado. Terminado.")
                 break
+
+            next_button.scroll_into_view_if_needed()
             next_button.click()
-            page.wait_for_load_state("networkidle")
+
+            page.wait_for_load_state('load')
             page.wait_for_selector('form[name="form"]', timeout=10000)
+
         except PlaywrightTimeoutError:
-            # No existe botón siguiente o timeout esperando la nueva página: terminamos
             break
+        except Exception as e:
+            print("Error inesperado, reintentando:", e)
+            time.sleep(2)
+            continue
 
     browser.close()
 
@@ -81,7 +75,7 @@ car_links = list(set(car_links))
 print("Total Number: ", len(car_links)) 
 
 
-# ----------- Continúa igual tu scraping con requests + BeautifulSoup -----------
+# ----------- Continua scraping con requests + BeautifulSoup -----------
 
 headers = {
     'User-Agent': 'Mozilla/5.0'
@@ -159,4 +153,4 @@ df["Fecha de ingreso"] = df["Fecha de ingreso"].apply(lambda x: datetime.strptim
 df["Price_CRC"] = df['Price_CRC'].apply(lambda x: x * 510 if len(str(x)) < 7 else x)
 
 # Save CSV
-df.to_csv(f'EVs_{datetime.today().date()}.csv', index=False)
+df.to_excel(f'EVs_{datetime.today().date()}.xlsx', index=False)
